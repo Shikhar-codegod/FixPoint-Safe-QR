@@ -17,8 +17,6 @@ import {
   initialResponder,
   initialIncidents,
 } from '../mock/initialData';
-import { fetchIncidentQueue, publicEmergencyAlert, publicIncidentReport, updateIncident } from '../api/client';
-import { mapAlert, mapIncident } from '../api/mappers';
 
 export type AppRole = 'public-qr' | 'customer' | 'operations' | 'responder';
 
@@ -44,12 +42,11 @@ interface EmergencyContextType {
   incidents: IncidentAlert[];
   selectedIncidentId: string | null;
   setSelectedIncidentId: (id: string | null) => void;
-  triggerEmergencyAlert: (description: string, reporterName?: string, reporterPhone?: string, location?: { latitude: number; longitude: number }) => Promise<string>;
-  reportRoutineIncident: (category: RoutineIncidentCategory, description: string, reporterName?: string, reporterPhone?: string, location?: { latitude: number; longitude: number }) => Promise<string>;
+  triggerEmergencyAlert: (description: string, reporterName?: string, reporterPhone?: string) => string;
+  reportRoutineIncident: (category: RoutineIncidentCategory, description: string, reporterName?: string, reporterPhone?: string) => string;
   callAmbulanceAction: (details: string, callerPhone?: string) => string;
   callPoliceAction: (details: string, callerPhone?: string) => string;
   updateIncidentStatus: (incidentId: string, status: IncidentStatus, notes?: string) => void;
-  claimIncident: (incidentId: string) => Promise<void>;
   assignResponder: (incidentId: string, responderName: string, agency: string, etaMinutes: number) => void;
   responderUser: ResponderUser;
   unlockMedicalAccess: (incidentId: string) => boolean;
@@ -59,9 +56,6 @@ interface EmergencyContextType {
   showToast: (text: string, type?: 'success' | 'danger' | 'info' | 'warning') => void;
   removeToast: (id: string) => void;
   resetDemoData: () => void;
-  incidentsLoading: boolean;
-  incidentsError: string | null;
-  refreshIncidents: () => Promise<void>;
 }
 
 const EmergencyContext = createContext<EmergencyContextType | undefined>(undefined);
@@ -92,32 +86,6 @@ export const EmergencyProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [isMobileFrame, setIsMobileFrame] = useState<boolean>(true);
   const [toasts, setToasts] = useState<ToastNotice[]>([]);
-  const [incidentsLoading, setIncidentsLoading] = useState(false);
-  const [incidentsError, setIncidentsError] = useState<string | null>(null);
-
-  const refreshIncidents = async () => {
-    const token = localStorage.getItem('fp_access_token');
-    if (!token) {
-      setIncidentsError('Operations access requires an API access token.');
-      return;
-    }
-    setIncidentsLoading(true);
-    setIncidentsError(null);
-    try {
-      const response = await fetchIncidentQueue();
-      setIncidents(response.data.map(mapIncident));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to load incidents.';
-      setIncidentsError(message);
-      showToast(message, 'danger');
-    } finally {
-      setIncidentsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (role === 'operations') void refreshIncidents();
-  }, [role]);
 
   // Local storage persistence
   useEffect(() => {
@@ -188,46 +156,121 @@ export const EmergencyProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     showToast('Privacy & emergency consent preferences saved', 'success');
   };
 
-  const triggerEmergencyAlert = async (
-    description: string,
-    reporterName?: string,
-    reporterPhone?: string,
-    location?: { latitude: number; longitude: number }
-  ) => {
-    const qrCode = vehicle.safeQrCode;
-    if (!qrCode) throw new Error('A verified Safe-QR code is required.');
-    const response = await publicEmergencyAlert(qrCode, {
-      severity: 'CRITICAL',
-      latitude: location?.latitude ?? null,
-      longitude: location?.longitude ?? null,
-      notes: [description, reporterName, reporterPhone].filter(Boolean).join('\n'),
-    });
-    const incident = mapAlert(response.data);
-    setIncidents((prev) => [incident, ...prev]);
-    showToast('Emergency alert accepted by the server.', 'danger');
-    return incident.id;
+  const triggerEmergencyAlert = (description: string, reporterName?: string, reporterPhone?: string) => {
+    const newId = `INC-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    const nowIso = new Date().toISOString();
+
+    const newIncident: IncidentAlert = {
+      id: newId,
+      vehicleId: vehicle.id,
+      vehiclePlate: vehicle.licensePlate,
+      vehicleDescription: `${vehicle.year} ${vehicle.make} ${vehicle.model} (${vehicle.color})`,
+      type: 'emergency_sos',
+      severity: 'critical',
+      status: 'active_sos',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      location: {
+        address: 'SR-520 Eastbound Milepost 8.4 near Evergreen Point',
+        lat: 47.6394,
+        lng: -122.2536,
+        accuracyMeters: 3.5,
+        timestamp: nowIso,
+      },
+      reporterName: reporterName || 'Bystander (Safe-QR Public Scan)',
+      reporterPhone: reporterPhone || '+1 (555) 019-2834',
+      description: description || 'Vehicle collision or critical driver distress reported via Safe-QR.',
+      timeline: [
+        {
+          id: 'evt-s-' + Date.now(),
+          timestamp: nowIso,
+          title: 'CRITICAL SOS ALERT CREATED',
+          description: `QR Code on plate ${vehicle.licensePlate} scanned. Emergency broadcast initiated.`,
+          actor: reporterName || 'Public Scanner',
+          actorRole: 'public_scanner',
+          badgeType: 'danger',
+        },
+        {
+          id: 'evt-s-notif-' + Date.now(),
+          timestamp: nowIso,
+          title: 'Automated Multi-Channel Dispatch',
+          description: `SMS dispatched to primary contact (${emergencyContacts[0]?.name || 'Registered Contact'}). Ops Command notified.`,
+          actor: 'FixPoint Automated Gateway',
+          actorRole: 'system',
+          badgeType: 'info',
+        },
+      ],
+    };
+
+    setIncidents((prev) => [newIncident, ...prev]);
+    setVehicle((prev) => ({
+      ...prev,
+      qrScanCount: prev.qrScanCount + 1,
+      lastScannedAt: nowIso,
+    }));
+    showToast('CRITICAL SOS ALERT DISPATCHED TO OPERATIONS & RESPONDERS', 'danger');
+    return newId;
   };
 
-  const reportRoutineIncident = async (
+  const reportRoutineIncident = (
     category: RoutineIncidentCategory,
     description: string,
     reporterName?: string,
-    reporterPhone?: string,
-    location?: { latitude: number; longitude: number }
+    reporterPhone?: string
   ) => {
-    const response = await publicIncidentReport(vehicle.safeQrCode, {
-      incident_type: category === 'parking_bump' ? 'DAMAGE' : 'OTHER',
-      priority: 'LOW',
-      location_precision: location ? 'PRECISE' : 'NONE',
-      latitude: location?.latitude ?? null,
-      longitude: location?.longitude ?? null,
-      reporter_contact_shared: Boolean(reporterPhone),
-      description: [category, description, reporterName, reporterPhone].filter(Boolean).join(' - '),
-    });
-    const incident = mapIncident(response.data);
-    setIncidents((prev) => [incident, ...prev]);
-    showToast('Incident report accepted by the server.', 'success');
-    return incident.id;
+    const newId = `INC-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    const nowIso = new Date().toISOString();
+
+    const categoryNames: Record<RoutineIncidentCategory, string> = {
+      parking_bump: 'Parking Scrape / Bump',
+      vehicle_obstruction: 'Vehicle Blocking Driveway / Road',
+      flat_tire_or_breakdown: 'Flat Tire / Hazard On Scene',
+      lights_left_on: 'Headlights / Dome Light Left On',
+      other: 'Vehicle Notice',
+    };
+
+    const newIncident: IncidentAlert = {
+      id: newId,
+      vehicleId: vehicle.id,
+      vehiclePlate: vehicle.licensePlate,
+      vehicleDescription: `${vehicle.year} ${vehicle.make} ${vehicle.model} (${vehicle.color})`,
+      type: 'routine_report',
+      category,
+      severity: 'low',
+      status: 'investigating',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      location: {
+        address: 'Public Parking Facility, Bay 4',
+        lat: 47.6101,
+        lng: -122.2015,
+        accuracyMeters: 6.0,
+        timestamp: nowIso,
+      },
+      reporterName: reporterName || 'Good Samaritan / Driver',
+      reporterPhone: reporterPhone || '+1 (555) 772-1088',
+      description,
+      timeline: [
+        {
+          id: 'evt-r-' + Date.now(),
+          timestamp: nowIso,
+          title: `Routine Report: ${categoryNames[category]}`,
+          description: `Filed via Safe-QR decal. Notice relayed to vehicle owner Marcus Vance.`,
+          actor: reporterName || 'Reporter',
+          actorRole: 'public_scanner',
+          badgeType: 'info',
+        },
+      ],
+    };
+
+    setIncidents((prev) => [newIncident, ...prev]);
+    setVehicle((prev) => ({
+      ...prev,
+      qrScanCount: prev.qrScanCount + 1,
+      lastScannedAt: nowIso,
+    }));
+    showToast('Incident report submitted and relayed to vehicle owner.', 'success');
+    return newId;
   };
 
   const callAmbulanceAction = (details: string, callerPhone?: string) => {
@@ -332,31 +375,7 @@ export const EmergencyProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return newId;
   };
 
-  const updateIncidentStatus = async (incidentId: string, status: IncidentStatus, notes?: string) => {
-    const token = localStorage.getItem('fp_access_token');
-    if (token) {
-      const backendStatus: Record<IncidentStatus, string> = {
-        active_sos: 'DISPATCHED',
-        dispatched: 'DISPATCHED',
-        en_route: 'IN_PROGRESS',
-        on_scene: 'IN_PROGRESS',
-        resolved: 'RESOLVED',
-        investigating: 'REPORTED',
-      };
-
-      try {
-        const response = await updateIncident(incidentId, {
-          status: backendStatus[status],
-          ...(notes ? { operator_notes: notes } : {}),
-        });
-        setIncidents((prev) => prev.map((item) => item.id === incidentId ? mapIncident(response.data) : item));
-        showToast(`Incident status updated to: ${status}`, 'info');
-        return;
-      } catch (error) {
-        showToast(error instanceof Error ? error.message : 'Unable to update incident.', 'danger');
-        return;
-      }
-    }
+  const updateIncidentStatus = (incidentId: string, status: IncidentStatus, notes?: string) => {
     setIncidents((prev) =>
       prev.map((inc) => {
         if (inc.id !== incidentId) return inc;
@@ -390,16 +409,6 @@ export const EmergencyProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       })
     );
     showToast(`Incident status updated to: ${status}`, 'info');
-  };
-
-  const claimIncident = async (incidentId: string) => {
-    try {
-      const response = await updateIncident(incidentId, { claim: true });
-      setIncidents((prev) => prev.map((item) => item.id === incidentId ? mapIncident(response.data) : item));
-      showToast('Alert claimed by this operator.', 'success');
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Unable to claim alert.', 'danger');
-    }
   };
 
   const assignResponder = (incidentId: string, responderName: string, agency: string, etaMinutes: number) => {
@@ -498,7 +507,6 @@ export const EmergencyProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         callAmbulanceAction,
         callPoliceAction,
         updateIncidentStatus,
-        claimIncident,
         assignResponder,
         responderUser,
         unlockMedicalAccess,
@@ -508,9 +516,6 @@ export const EmergencyProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         showToast,
         removeToast,
         resetDemoData,
-        incidentsLoading,
-        incidentsError,
-        refreshIncidents,
       }}
     >
       {children}

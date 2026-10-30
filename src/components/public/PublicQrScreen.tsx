@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useEmergency } from '../../context/EmergencyContext';
 import { BrandLogo } from '../common/BrandLogo';
 import { PublicAmbulanceModal } from './PublicAmbulanceModal';
 import { PublicPoliceModal } from './PublicPoliceModal';
 import { PublicReportIncidentModal } from './PublicReportIncidentModal';
 import { PublicSosTriggerModal } from './PublicSosTriggerModal';
+import { PublicClaimHelpModal } from '../claims/ClaimWizard';
 import {
   Ambulance,
   Shield,
@@ -15,6 +16,7 @@ import {
   CheckCircle,
   RefreshCw,
   ShieldOff,
+  ClipboardList,
 } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -47,8 +49,10 @@ const getQrToken = (): string | null => {
 export const PublicQrScreen: React.FC = () => {
   const { vehicle, updateVehicle, isMobileFrame } = useEmergency();
   const [qrState, setQrState] = useState<QrState>({ status: 'checking' });
+  const claimsButtonRef = useRef<HTMLButtonElement>(null);
+
   const [activeModal, setActiveModal] = useState<
-    'ambulance' | 'police' | 'incident' | 'sos' | null
+    'ambulance' | 'police' | 'incident' | 'sos' | 'claims' | null
   >(null);
 
   const qrToken = getQrToken();
@@ -228,6 +232,26 @@ export const PublicQrScreen: React.FC = () => {
           </span>
         </button>
 
+        <button
+          ref={claimsButtonRef}
+          onClick={() => setActiveModal('claims')}
+          className="group col-span-2 mt-4 flex w-full items-center gap-3 rounded-[12px] border border-[#E2E8F0] bg-white p-3 text-left hover:border-[#142B4A] hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#142B4A]/20"
+        >
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border border-[#E2E8F0] bg-[#F5F7FA] group-hover:bg-[#142B4A]">
+            <ClipboardList className="h-6 w-6 text-[#142B4A] group-hover:text-white" />
+          </div>
+          <div className="min-w-0">
+            <span className="block text-[15px] font-semibold text-[#172B43]">
+              Accident & Insurance Claim Help
+            </span>
+            <span className="mt-0.5 block text-xs text-[#718096]">
+              Step-by-step guidance after an accident, theft or damage
+            </span>
+            <span className="mt-1 block text-[11px] text-[#718096]">
+              Guidance only. Does not file a claim.
+            </span>
+          </div>
+        </button>
       </div>
 
       {/* Bottom Minimal Location & Security Status */}
@@ -278,6 +302,15 @@ export const PublicQrScreen: React.FC = () => {
       <PublicSosTriggerModal
         isOpen={activeModal === 'sos'}
         onClose={() => setActiveModal(null)}
+      />
+      <PublicClaimHelpModal
+        isOpen={activeModal === 'claims'}
+        onClose={() => {
+          setActiveModal(null);
+          window.requestAnimationFrame(() => claimsButtonRef.current?.focus());
+        }}
+        qrCode={resolvedVehicle.safeQrCode}
+        onOpenEmergency={() => setActiveModal('sos')}
       />
     </div>
   );

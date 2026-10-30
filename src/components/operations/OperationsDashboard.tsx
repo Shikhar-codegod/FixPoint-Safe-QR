@@ -5,6 +5,7 @@ import { IncidentAlert, IncidentType } from '../../types';
 import {
   Activity,
   AlertOctagon,
+  Ambulance,
   Car,
   CheckCircle2,
   Clock,
@@ -19,7 +20,6 @@ import {
   ShieldAlert,
   Users,
   Eye,
-  RefreshCw,
 } from 'lucide-react';
 
 interface Props {
@@ -33,9 +33,8 @@ export const OperationsDashboard: React.FC<Props> = ({ activeTab, setActiveTab }
     vehicle,
     selectedIncidentId,
     setSelectedIncidentId,
-    incidentsLoading,
-    incidentsError,
-    refreshIncidents,
+    triggerEmergencyAlert,
+    reportRoutineIncident,
   } = useEmergency();
 
   const [filterType, setFilterType] = useState<'all' | 'critical' | 'routine'>('all');
@@ -68,7 +67,6 @@ export const OperationsDashboard: React.FC<Props> = ({ activeTab, setActiveTab }
 
   const resolvedCount = incidents.filter((i) => i.status === 'resolved').length;
   const routineCount = incidents.filter((i) => i.type === 'routine_report').length;
-  const primaryIncident = incidents[0];
 
   return (
     <div className="space-y-6">
@@ -89,22 +87,37 @@ export const OperationsDashboard: React.FC<Props> = ({ activeTab, setActiveTab }
           </p>
         </div>
 
-        {/* Server-backed operations controls */}
+        {/* Quick simulator triggers */}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => void refreshIncidents()}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-[#142B4A] hover:bg-[#203D60] text-white text-xs font-semibold shadow-xs transition-colors"
+            onClick={() =>
+              triggerEmergencyAlert(
+                'Simulated multi-vehicle collision with rollover on Interstate 405.',
+                'Highway Callbox Witness',
+                '+1 (555) 991-2041'
+              )
+            }
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-[#D93636] hover:bg-[#BD2929] text-white text-xs font-semibold shadow-xs transition-colors"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${incidentsLoading ? 'animate-spin' : ''}`} />
-            <span>Refresh server queue</span>
+            <AlertOctagon className="w-3.5 h-3.5" />
+            <span>Simulate Incoming SOS</span>
+          </button>
+
+          <button
+            onClick={() =>
+              reportRoutineIncident(
+                'parking_bump',
+                'Minor bump while pulling into parallel space on Pine St.',
+                'Driver in Spot 12'
+              )
+            }
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-[#E2E8F0] bg-white hover:bg-[#F5F7FA] text-[#172B43] text-xs font-medium transition-colors"
+          >
+            <FileText className="w-3.5 h-3.5 text-[#718096]" />
+            <span>Simulate Routine Report</span>
           </button>
         </div>
       </div>
-      {incidentsError && (
-        <div role="alert" className="rounded-[8px] border border-[#D93636]/30 bg-[#FFF5F5] px-3 py-2 text-xs text-[#D93636]">
-          {incidentsError}
-        </div>
-      )}
 
       {/* 5 Compact Metric Cards (Section 7 requirement) */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
@@ -141,7 +154,7 @@ export const OperationsDashboard: React.FC<Props> = ({ activeTab, setActiveTab }
             {incidents.filter((i) => i.status === 'dispatched' || i.status === 'en_route').length}
           </div>
           <div className="mt-1 text-[11px] text-[#23845B] font-medium">
-            Server-reported assignments
+            2 EMS • 1 Patrol Active
           </div>
         </div>
 
@@ -186,10 +199,10 @@ export const OperationsDashboard: React.FC<Props> = ({ activeTab, setActiveTab }
             <Shield className="w-4 h-4 text-[#142B4A]" />
           </div>
           <div className="mt-2 text-2xl font-bold text-[#172B43]">
-            {incidents.length}
+            1,482
           </div>
           <div className="mt-1 text-[11px] text-[#23845B] font-medium">
-            Records in current queue
+            99.98% Network Uptime
           </div>
         </div>
       </div>
@@ -212,7 +225,7 @@ export const OperationsDashboard: React.FC<Props> = ({ activeTab, setActiveTab }
               </div>
             </div>
 
-            {/* Location radar based on the latest server record */}
+            {/* Simulated High-Precision Automotive Map Radar Canvas */}
             <div className="relative mt-3 h-72 w-full bg-[#142B4A] rounded-[10px] overflow-hidden border border-[#203D60] select-none flex items-center justify-center">
               {/* Grid overlay */}
               <div
@@ -233,7 +246,8 @@ export const OperationsDashboard: React.FC<Props> = ({ activeTab, setActiveTab }
               <div className="absolute w-full h-[1px] bg-white/10" />
               <div className="absolute h-full w-[1px] bg-white/10" />
 
-              {primaryIncident && <div className="absolute z-10 flex flex-col items-center">
+              {/* Central Target Vehicle Ping (FP-8492-WA) */}
+              <div className="absolute z-10 flex flex-col items-center">
                 <div className="relative flex items-center justify-center">
                   <span className="animate-ping absolute inline-flex h-8 w-8 rounded-full bg-[#D93636] opacity-75"></span>
                   <div className="w-6 h-6 rounded-full bg-[#D93636] border-2 border-white flex items-center justify-center shadow-lg">
@@ -241,9 +255,29 @@ export const OperationsDashboard: React.FC<Props> = ({ activeTab, setActiveTab }
                   </div>
                 </div>
                 <div className="mt-1 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-xs text-[10px] font-mono text-white font-bold whitespace-nowrap border border-white/20">
-                  {primaryIncident.vehiclePlate} (SOS)
+                  {vehicle.licensePlate} (SOS)
                 </div>
-              </div>}
+              </div>
+
+              {/* Responder Unit Marker 1: Medic 402 */}
+              <div className="absolute top-12 left-16 z-10 flex flex-col items-center">
+                <div className="w-5 h-5 rounded-full bg-[#23845B] border border-white flex items-center justify-center shadow">
+                  <Ambulance className="w-3 h-3 text-white" />
+                </div>
+                <span className="text-[9px] font-mono text-white bg-black/70 px-1 rounded mt-0.5">
+                  Medic-402 (ETA 3m)
+                </span>
+              </div>
+
+              {/* Responder Unit Marker 2: Patrol 14 */}
+              <div className="absolute bottom-12 right-20 z-10 flex flex-col items-center">
+                <div className="w-5 h-5 rounded-full bg-[#203D60] border border-white flex items-center justify-center shadow">
+                  <Shield className="w-3 h-3 text-white" />
+                </div>
+                <span className="text-[9px] font-mono text-white bg-black/70 px-1 rounded mt-0.5">
+                  Patrol-14 (ETA 6m)
+                </span>
+              </div>
 
               {/* Radar controls */}
               <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5 bg-black/60 backdrop-blur-xs px-2 py-1 rounded-[6px] text-[10px] text-white font-mono">
@@ -261,9 +295,7 @@ export const OperationsDashboard: React.FC<Props> = ({ activeTab, setActiveTab }
               </div>
               <div className="flex justify-between text-[#718096] text-[11px]">
                 <span>Coordinates:</span>
-                <span className="font-mono">
-                  {primaryIncident ? `${primaryIncident.location.lat.toFixed(5)}°, ${primaryIncident.location.lng.toFixed(5)}°` : 'Unavailable'}
-                </span>
+                <span className="font-mono">47.6205° N, 122.1887° W</span>
               </div>
             </div>
           </div>

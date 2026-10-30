@@ -23,7 +23,3 @@ REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'] = (
 )
 
 CORS_ALLOW_ALL_ORIGINS = True
-
-# Celery fallback for local development / testing without Redis running
-CELERY_TASK_ALWAYS_EAGER = env.bool('CELERY_TASK_ALWAYS_EAGER', default=True)
-CELERY_TASK_EAGER_PROPAGATES = True
