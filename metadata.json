@@ -1,0 +1,6 @@
+{
+  "name": "FixPoint Drive Safe-QR SOS",
+  "description": "Automotive emergency assistance platform with vehicle-specific Safe-QR incident dispatch, public SOS scanning, responder access, and command operations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
