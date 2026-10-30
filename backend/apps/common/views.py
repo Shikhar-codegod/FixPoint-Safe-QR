@@ -1,6 +1,7 @@
 import logging
 from django.db import connection
 from django.core.cache import cache
+from django.http import JsonResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -8,6 +9,13 @@ from rest_framework import status
 from drf_spectacular.utils import extend_schema, OpenApiResponse
 
 logger = logging.getLogger('apps.common')
+
+def api_root(request):
+    return JsonResponse({
+        'name': 'FixPoint Drive Safe-QR SOS API',
+        'health': '/api/v1/health/',
+        'docs': '/api/v1/docs/',
+    })
 
 class HealthCheckView(APIView):
     """

@@ -26,6 +26,7 @@ export const IncidentDetailModal: React.FC<Props> = ({ incidentId, onClose }) =>
   const {
     incidents,
     updateIncidentStatus,
+    claimIncident,
     assignResponder,
     vehicle,
     emergencyContacts,
@@ -291,6 +292,12 @@ export const IncidentDetailModal: React.FC<Props> = ({ incidentId, onClose }) =>
         {/* Footer Actions: Status Transition */}
         <div className="p-4 bg-[#F5F7FA] border-t border-[#E2E8F0] flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => void claimIncident(incident.id)}
+              className="px-2.5 py-1.5 rounded-[6px] text-xs font-semibold bg-[#D93636] hover:bg-[#BD2929] text-white"
+            >
+              Claim Alert
+            </button>
             <span className="text-xs text-[#718096] font-medium">Set Status:</span>
             <button
               onClick={() => handleStatusChange('en_route')}

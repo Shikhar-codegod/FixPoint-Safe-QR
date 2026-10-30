@@ -1,4 +1,6 @@
+from django.db import transaction
 from apps.audit.services import log_audit_event
+from apps.notifications.services import start_contact_chains_for_alert
 from .models import AlertRecord, AlertStatus, AlertSeverity
 
 def create_alert_record(
@@ -27,4 +29,5 @@ def create_alert_record(
         target_id=str(alert.id),
         payload={'status': alert.status, 'severity': alert.severity}
     )
+    transaction.on_commit(lambda: start_contact_chains_for_alert(alert))
     return alert

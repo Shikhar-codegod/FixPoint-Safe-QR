@@ -23,6 +23,12 @@ env = environ.Env(
     JWT_REFRESH_TOKEN_LIFETIME_DAYS=(int, 7),
     CORS_ALLOWED_ORIGINS=(list, ['http://localhost:3000', 'http://127.0.0.1:3000']),
     FIELD_ENCRYPTION_KEY=(str, '-dH3bVNkLyz65qi4aCC9qxXJaUpe1947ZbGFpIM0E3s='),
+    NOTIFICATION_PROVIDER_MODE=(str, 'mock'),
+    NOTIFICATION_WHATSAPP_WAIT_SECONDS=(int, 60),
+    NOTIFICATION_SMS_TO_CALL_DELAY_SECONDS=(int, 30),
+    NOTIFICATION_CALL_RETRY_LIMIT=(int, 1),
+    NOTIFICATION_PENDING_STALE_SECONDS=(int, 20),
+    MOCK_FAIL_CHANNELS=(str, ''),
 )
 
 # Read .env file if present
@@ -151,6 +157,10 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
     ),
+    'DEFAULT_THROTTLE_RATES': {
+        'public_incident_ip': '5/hour',
+        'public_incident_qr': '18/hour',
+    },
 }
 
 # Simple JWT Settings
@@ -184,8 +194,23 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
+CELERY_BEAT_SCHEDULE = {
+    'notification-sweeper-every-10-seconds': {
+        'task': 'apps.notifications.tasks.process_due_chains_task',
+        'schedule': 10.0,
+    },
+}
+
 # Field-Level Encryption
 FIELD_ENCRYPTION_KEY = env('FIELD_ENCRYPTION_KEY')
+
+# Notification Engine Settings
+NOTIFICATION_PROVIDER_MODE = env('NOTIFICATION_PROVIDER_MODE')
+NOTIFICATION_WHATSAPP_WAIT_SECONDS = env('NOTIFICATION_WHATSAPP_WAIT_SECONDS')
+NOTIFICATION_SMS_TO_CALL_DELAY_SECONDS = env('NOTIFICATION_SMS_TO_CALL_DELAY_SECONDS')
+NOTIFICATION_CALL_RETRY_LIMIT = env('NOTIFICATION_CALL_RETRY_LIMIT')
+NOTIFICATION_PENDING_STALE_SECONDS = env('NOTIFICATION_PENDING_STALE_SECONDS')
+MOCK_FAIL_CHANNELS = env('MOCK_FAIL_CHANNELS')
 
 # Sensitive-Data-Safe Logging
 LOGGING = {

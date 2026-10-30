@@ -16,24 +16,29 @@ export const PublicReportIncidentModal: React.FC<Props> = ({ isOpen, onClose }) 
   const [reporterPhone, setReporterPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmedId, setConfirmedId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!description.trim()) return;
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      const id = reportRoutineIncident(
+    setError(null);
+    try {
+      const id = await reportRoutineIncident(
         category,
         description,
         reporterName || undefined,
         reporterPhone || undefined
       );
       setConfirmedId(id);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Unable to submit the report.');
+    } finally {
       setIsSubmitting(false);
-    }, 350);
+    }
   };
 
   return (
@@ -69,10 +74,10 @@ export const PublicReportIncidentModal: React.FC<Props> = ({ isOpen, onClose }) 
             </div>
             <div>
               <h4 className="text-[18px] font-semibold text-[#172B43]">
-                Report Relayed to Owner
+                Report accepted
               </h4>
               <p className="text-xs text-[#718096] mt-1">
-                Notice #{confirmedId} sent to Marcus Vance ({vehicle.licensePlate}).
+                Report #{confirmedId} was saved for Safe-QR {vehicle.licensePlate}.
               </p>
             </div>
 
@@ -82,7 +87,7 @@ export const PublicReportIncidentModal: React.FC<Props> = ({ isOpen, onClose }) 
                 <span>Privacy-Preserving Relay</span>
               </div>
               <p>
-                The vehicle owner has been alerted with your message. Neither party's home address or private identity was exposed.
+                The report is now available to the authorized operations workflow. No emergency contacts were notified.
               </p>
             </div>
 
@@ -173,6 +178,7 @@ export const PublicReportIncidentModal: React.FC<Props> = ({ isOpen, onClose }) 
                 <span>{isSubmitting ? 'Sending Notice...' : 'Send Incident Notice'}</span>
               </button>
             </div>
+            {error && <p role="alert" className="text-xs text-[#D93636]">{error}</p>}
           </form>
         )}
       </div>
