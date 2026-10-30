@@ -1,8 +1,10 @@
 from django.contrib import admin
 from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
+from apps.common.views import api_root
 
 urlpatterns = [
+    path('', api_root, name='api-root'),
     # Django admin
     path('admin/', admin.site.urls),
 

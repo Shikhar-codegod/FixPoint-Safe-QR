@@ -6,7 +6,6 @@ import {
   Radio,
   Send,
   ShieldAlert,
-  Users,
   X,
   CheckCircle,
 } from 'lucide-react';
@@ -24,7 +23,6 @@ export const PublicSosTriggerModal: React.FC<Props> = ({
 }) => {
   const {
     vehicle,
-    emergencyContacts,
     triggerEmergencyAlert,
     setRole,
   } = useEmergency();
@@ -33,21 +31,47 @@ export const PublicSosTriggerModal: React.FC<Props> = ({
   const [reporterPhone, setReporterPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmedId, setConfirmedId] = useState<string | null>(null);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | undefined>();
+  const [error, setError] = useState<string | null>(null);
+  const [isPreview, setIsPreview] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleTrigger = (e: React.FormEvent) => {
+  const handleTrigger = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isPreview) {
+      setIsPreview(true);
+      return;
+    }
     setIsSubmitting(true);
-    setTimeout(() => {
-      const id = triggerEmergencyAlert(
+    setError(null);
+    try {
+      const id = await triggerEmergencyAlert(
         description || 'High-urgency collision / distress alert triggered from Safe-QR decal scan.',
         'Public Scanner on Scene',
-        reporterPhone || '+1 (555) 911-0000'
+        reporterPhone || undefined,
+        location
       );
       setConfirmedId(id);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Unable to create the alert.');
+    } finally {
       setIsSubmitting(false);
-    }, 400);
+    }
+  };
+
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      setError('Location is not available on this device. You can still submit the alert.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => setLocation({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      }),
+      () => setError('Location permission was denied. You can still submit the alert.')
+    );
   };
 
   return (
@@ -98,17 +122,17 @@ export const PublicSosTriggerModal: React.FC<Props> = ({
             <div className="bg-[#F5F7FA] p-3.5 rounded-[10px] border border-[#E2E8F0] text-left text-xs space-y-2">
               <div className="flex items-center gap-2 text-[#23845B] font-medium">
                 <CheckCircle className="w-4 h-4 shrink-0" />
-                <span>Regional Operations Command CAD alerted</span>
+                <span>Alert record accepted by FixPoint</span>
               </div>
               <div className="flex items-center gap-2 text-[#23845B] font-medium">
                 <CheckCircle className="w-4 h-4 shrink-0" />
                 <span>
-                  SMS sent to primary contact ({emergencyContacts[0]?.name || 'Family'})
+                  Contact notification processing started where configured
                 </span>
               </div>
               <div className="flex items-center gap-2 text-[#23845B] font-medium">
                 <CheckCircle className="w-4 h-4 shrink-0" />
-                <span>Live GPS location locked & transmitted</span>
+                <span>{location ? 'Location included with alert' : 'Location was not provided'}</span>
               </div>
             </div>
 
@@ -144,7 +168,7 @@ export const PublicSosTriggerModal: React.FC<Props> = ({
                   Immediate Emergency Action:
                 </span>
                 <p className="text-[12px] text-[#718096] mt-0.5">
-                  This will dispatch an urgent SOS alert for vehicle <strong>{vehicle.licensePlate}</strong> ({vehicle.make} {vehicle.model}) to 24/7 Operations Command and the registered family emergency contacts.
+                  This submits an emergency alert record for vehicle <strong>{vehicle.licensePlate}</strong> ({vehicle.make} {vehicle.model}). FixPoint does not claim that emergency services were dispatched.
                 </p>
               </div>
             </div>
@@ -156,10 +180,14 @@ export const PublicSosTriggerModal: React.FC<Props> = ({
                   Vehicle Incident Location:
                 </span>
                 <p className="text-[#718096] text-[11px] mt-0.5 font-mono">
-                  SR-520 Eastbound Milepost 8.4 (Lat 47.6394, Lng -122.2536)
+                  {location ? `Lat ${location.latitude.toFixed(5)}, Lng ${location.longitude.toFixed(5)}` : 'Location not requested'}
                 </p>
               </div>
             </div>
+
+            <button type="button" onClick={requestLocation} className="w-full py-2 border border-[#E2E8F0] rounded-[8px] text-xs text-[#142B4A]">
+              {location ? 'Location captured' : 'Request current location (optional)'}
+            </button>
 
             <div>
               <label className="block text-[13px] font-medium text-[#172B43] mb-1.5">
@@ -187,6 +215,16 @@ export const PublicSosTriggerModal: React.FC<Props> = ({
               />
             </div>
 
+            {isPreview && (
+              <div className="rounded-[10px] border border-[#D93636]/30 bg-[#FFF5F5] p-3 text-xs text-[#172B43]">
+                <strong>Alert preview</strong>
+                <p className="mt-1">{description || 'No description provided.'}</p>
+                <p className="mt-1 text-[#718096]">
+                  {location ? 'Current location will be included.' : 'No location will be included.'}
+                </p>
+              </div>
+            )}
+
             <div className="pt-2">
               <button
                 type="submit"
@@ -194,12 +232,13 @@ export const PublicSosTriggerModal: React.FC<Props> = ({
                 className="w-full py-3.5 bg-[#D93636] hover:bg-[#BD2929] text-white rounded-[8px] text-[15px] font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
               >
                 <AlertOctagon className="w-5 h-5 text-white" />
-                <span>{isSubmitting ? 'BROADCASTING SOS...' : 'TRANSMIT CRITICAL SOS NOW'}</span>
+                <span>{isSubmitting ? 'SUBMITTING ALERT...' : isPreview ? 'CONFIRM & SUBMIT ALERT' : 'PREVIEW ALERT'}</span>
               </button>
               <p className="text-[11px] text-[#718096] text-center mt-2">
-                Simulates real-world FixPoint automotive telemetry & SMS dispatch.
+                Nothing is submitted until you explicitly confirm the preview.
               </p>
             </div>
+            {error && <p role="alert" className="text-xs text-[#D93636]">{error}</p>}
           </form>
         )}
       </div>

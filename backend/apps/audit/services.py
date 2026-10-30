@@ -5,7 +5,10 @@ from .models import AuditEvent
 logger = logging.getLogger('apps.audit')
 
 # Sensitive keys to sanitize from audit log payloads
-SENSITIVE_KEYS = {'password', 'token', 'access', 'refresh', 'secret', 'authorization'}
+SENSITIVE_KEYS = {
+    'password', 'token', 'access', 'refresh', 'secret', 'authorization',
+    'phone', 'phone_number', 'email', 'number', 'destination', 'recipient_destination'
+}
 
 def sanitize_payload(payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     if not payload or not isinstance(payload, dict):
