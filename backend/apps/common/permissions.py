@@ -107,3 +107,40 @@ class IsAdminRole(BasePermission):
             request.user.is_authenticated and
             (request.user.role == 'ADMIN' or request.user.is_staff or request.user.is_superuser)
         )
+
+class IsDispatchAssigneeOrOperator(BasePermission):
+    """
+    Object-level permission for responder dispatches:
+    - Operators, Supervisors, and Admins can access any dispatch.
+    - Verified Responders can only access dispatches assigned directly to them.
+    - Unverified responders and Customers have no access.
+    """
+    def has_permission(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return False
+        is_verified_responder = (
+            request.user.role in ['POLICE_RESPONDER', 'MEDICAL_RESPONDER'] and
+            getattr(request.user, 'is_verified_responder', False)
+        )
+        is_operator = (
+            request.user.role in ['OPERATOR', 'SUPERVISOR', 'ADMIN'] or
+            request.user.is_staff or
+            request.user.is_superuser
+        )
+        return is_verified_responder or is_operator
+
+    def has_object_permission(self, request, view, obj):
+        if not (request.user and request.user.is_authenticated):
+            return False
+        if (
+            request.user.role in ['OPERATOR', 'SUPERVISOR', 'ADMIN'] or
+            request.user.is_staff or
+            request.user.is_superuser
+        ):
+            return True
+        return bool(
+            request.user.role in ['POLICE_RESPONDER', 'MEDICAL_RESPONDER'] and
+            getattr(request.user, 'is_verified_responder', False) and
+            getattr(obj, 'responder_id', None) == request.user.id
+        )
+

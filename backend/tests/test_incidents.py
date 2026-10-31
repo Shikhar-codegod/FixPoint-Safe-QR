@@ -196,9 +196,9 @@ class TestIncidentReporting:
         # Operator CAN PATCH status
         op_client = APIClient()
         op_client.force_authenticate(user=operator)
-        op_res = op_client.patch(detail_url, {'status': IncidentStatus.RESOLVED})
+        op_res = op_client.patch(detail_url, {'status': IncidentStatus.IN_PROGRESS})
         assert op_res.status_code == status.HTTP_200_OK
-        assert op_res.json()['data']['status'] == IncidentStatus.RESOLVED
+        assert op_res.json()['data']['status'] == IncidentStatus.IN_PROGRESS
 
     def test_operator_queue_access(self, customer, operator):
         queue_url = reverse('incidents:incident-queue')

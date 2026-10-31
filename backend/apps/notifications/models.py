@@ -16,12 +16,20 @@ class NotificationStatus(models.TextChoices):
     SENT = 'SENT', 'Sent'
     DELIVERED = 'DELIVERED', 'Delivered'
     FAILED = 'FAILED', 'Failed'
+    CANCELLED = 'CANCELLED', 'Cancelled'
 
 class NotificationRecord(BaseModel):
     """
     Foundational notification record tracking outgoing emergency communications.
     Stores masked recipient destination to prevent plaintext phone exposure.
     """
+    alert = models.ForeignKey(
+        'alerts.AlertRecord',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notifications'
+    )
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
