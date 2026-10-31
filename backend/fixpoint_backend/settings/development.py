@@ -27,3 +27,16 @@ CORS_ALLOW_ALL_ORIGINS = True
 # Celery fallback for local development / testing without Redis running
 CELERY_TASK_ALWAYS_EAGER = env.bool('CELERY_TASK_ALWAYS_EAGER', default=True)
 CELERY_TASK_EAGER_PROPAGATES = True
+
+# Validate FIELD_ENCRYPTION_KEY format if provided in development
+field_encryption_key = env('FIELD_ENCRYPTION_KEY', default='')
+if field_encryption_key:
+    try:
+        from cryptography.fernet import Fernet
+        key_bytes = field_encryption_key.encode('utf-8') if isinstance(field_encryption_key, str) else field_encryption_key
+        Fernet(key_bytes)
+    except Exception:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured(
+            "FIELD_ENCRYPTION_KEY is invalid. It must be a 32 url-safe base64-encoded string."
+        )

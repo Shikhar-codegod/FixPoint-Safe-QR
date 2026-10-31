@@ -68,5 +68,14 @@ class EmergencyContact(BaseModel):
             )
         ]
 
+    def save(self, *args, **kwargs):
+        if not self.phone_hash and self.phone_number:
+            try:
+                from .utils import compute_phone_hash
+                self.phone_hash = compute_phone_hash(self.phone_number)
+            except Exception:
+                pass
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.name} ({self.relationship}) - User: {self.user.email} [{self.consent_status}]"

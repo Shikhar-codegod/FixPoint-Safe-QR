@@ -104,6 +104,28 @@ NOTIFICATION_PENDING_STALE_SECONDS=10
 
 ### Emergency Contacts (`/api/v1/contacts/`)
 
+## Environment Variables
+
+| Variable | Purpose |
+|---|---|
+| `DJANGO_SECRET_KEY` | Django signing key |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `REDIS_URL` | Redis cache |
+| `CELERY_BROKER_URL` | Celery broker |
+| `FIELD_ENCRYPTION_KEY` | Fernet key for field-level encryption (32 url-safe base64 bytes) |
+
+> **Generating a Fernet Key:**
+> ```bash
+> python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+> ```
+> *Note: Set `FIELD_ENCRYPTION_KEY` in your `.env` file before running the application. Never commit encryption keys.*
+
+---
+
+## Detailed Endpoints Table (`/api/v1/`)
+
+### Emergency Contacts (`/api/v1/contacts/`)
+
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
 | `GET` | `/api/v1/contacts/` | Authenticated | List current user's emergency contacts (decrypted). |

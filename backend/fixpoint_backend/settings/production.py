@@ -1,6 +1,28 @@
+from cryptography.fernet import Fernet
+from django.core.exceptions import ImproperlyConfigured
 from .base import *
 
 DEBUG = False
+
+# Production requires FIELD_ENCRYPTION_KEY to be explicitly configured and valid
+field_encryption_key = env('FIELD_ENCRYPTION_KEY', default='')
+if not field_encryption_key:
+    raise ImproperlyConfigured(
+        "FIELD_ENCRYPTION_KEY environment variable is required in production."
+    )
+
+try:
+    key_bytes = (
+        field_encryption_key.encode('utf-8')
+        if isinstance(field_encryption_key, str)
+        else field_encryption_key
+    )
+    Fernet(key_bytes)
+except Exception:
+    raise ImproperlyConfigured(
+        "FIELD_ENCRYPTION_KEY is invalid. It must be a 32 url-safe base64-encoded string."
+    )
+
 
 # Production requires PostgreSQL configured via DATABASE_URL
 DATABASES = {

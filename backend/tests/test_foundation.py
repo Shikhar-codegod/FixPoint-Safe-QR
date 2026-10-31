@@ -257,10 +257,13 @@ class TestRoleBasedPermissions(TestCase):
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
     def test_police_responder_can_access_dispatches(self):
+        self.police.is_verified_responder = True
+        self.police.save()
         token = self._get_token('police@fixpoint.io', 'TestPass!2026')
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         resp = self.client.get(reverse('responders:responder-dispatches'))
         assert resp.status_code == status.HTTP_200_OK
+
 
     def test_responder_is_not_auto_verified(self):
         """Selecting a responder role must never auto-verify the responder."""

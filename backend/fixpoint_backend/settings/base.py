@@ -22,7 +22,7 @@ env = environ.Env(
     JWT_ACCESS_TOKEN_LIFETIME_MINUTES=(int, 60),
     JWT_REFRESH_TOKEN_LIFETIME_DAYS=(int, 7),
     CORS_ALLOWED_ORIGINS=(list, ['http://localhost:3000', 'http://127.0.0.1:3000']),
-    FIELD_ENCRYPTION_KEY=(str, '-dH3bVNkLyz65qi4aCC9qxXJaUpe1947ZbGFpIM0E3s='),
+    FIELD_ENCRYPTION_KEY=(str, ''),
     NOTIFICATION_PROVIDER_MODE=(str, 'mock'),
     NOTIFICATION_WHATSAPP_WAIT_SECONDS=(int, 60),
     NOTIFICATION_SMS_TO_CALL_DELAY_SECONDS=(int, 30),
@@ -160,6 +160,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'public_incident_ip': '5/hour',
         'public_incident_qr': '18/hour',
+        'public_qr_scan': '60/minute',
     },
 }
 

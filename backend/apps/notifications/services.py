@@ -29,13 +29,15 @@ def queue_notification(
     body: str,
     channel: str = NotificationChannel.SMS,
     title: str = '',
-    recipient=None
+    recipient=None,
+    alert=None
 ) -> NotificationRecord:
     """
     Foundational notification dispatcher with destination masking.
     """
     masked_dest = mask_phone_number(recipient_destination) if recipient_destination else ''
     record = NotificationRecord.objects.create(
+        alert=alert,
         recipient=recipient,
         recipient_destination=masked_dest,
         channel=channel,
@@ -132,8 +134,8 @@ def process_chain(chain_id: str, now=None) -> Optional[ContactNotificationChain]
             DeliveryAttempt.objects.filter(chain=chain, status=AttemptStatus.PENDING).update(status=AttemptStatus.CANCELLED)
             return chain
 
-        # RE-CHECK: Alert must not be RESOLVED or CANCELLED
-        if chain.alert.status in ['RESOLVED', 'CANCELLED']:
+        # RE-CHECK: Alert must not be RESOLVED, CANCELLED or CLOSED
+        if chain.alert.status in ['RESOLVED', 'CANCELLED', 'CLOSED']:
             logger.info(f"Alert {chain.alert_id} is {chain.alert.status}; cancelling notification chain.")
             chain.status = ChainStatus.CANCELLED
             chain.save(update_fields=['status', 'updated_at'])
@@ -434,7 +436,7 @@ def acknowledge_chain_by_token(token: str, channel: str = 'WEB') -> Tuple[bool, 
         if not chain:
             return False, "Invalid or unrecognized acknowledgement token.", None
 
-        if chain.alert.status in ['RESOLVED', 'CANCELLED']:
+        if chain.alert.status in ['RESOLVED', 'CANCELLED', 'CLOSED']:
             return False, "Emergency alert is already closed.", chain
 
         if chain.status == ChainStatus.ACKNOWLEDGED:

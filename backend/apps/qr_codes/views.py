@@ -9,7 +9,8 @@ from apps.common.exceptions import custom_exception_handler
 from .models import QRCodeBadge
 from .serializers import QRCodeBadgeSerializer
 from .services import create_qr_badge
-from .selectors import list_user_badges, get_badge_by_code
+from .selectors import list_user_badges, get_badge_by_code, get_badge_by_token
+from .throttles import PublicQRScanRateThrottle
 
 @extend_schema(summary="List/Create Safe-QR Badges")
 class UserQRCodeBadgesView(APIView):
@@ -25,8 +26,11 @@ class UserQRCodeBadgesView(APIView):
             vehicle_registration=request.data.get('vehicle_registration', ''),
             vehicle_model=request.data.get('vehicle_model', '')
         )
+        data = QRCodeBadgeSerializer(badge).data
+        if hasattr(badge, 'raw_token'):
+            data['raw_token'] = badge.raw_token
         return api_response(
-            data=QRCodeBadgeSerializer(badge).data,
+            data=data,
             message="Safe-QR badge registered successfully.",
             status_code=status.HTTP_201_CREATED
         )
@@ -35,10 +39,11 @@ class UserQRCodeBadgesView(APIView):
 class QRCodePublicResolveView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
+    throttle_classes = [PublicQRScanRateThrottle]
 
     def get(self, request, code_identifier):
         with transaction.atomic():
-            badge = get_badge_by_code(code_identifier)
+            badge = get_badge_by_token(code_identifier)
             if not badge or badge.status != 'ACTIVE':
                 badge = None
             else:
@@ -52,6 +57,7 @@ class QRCodePublicResolveView(APIView):
                 message="Safe-QR badge not found or unavailable.",
                 status_code=status.HTTP_404_NOT_FOUND
             )
+        # Never leak scan_count, last_scanned_at, or owner data to public callers
         return api_response(
             data={
                 'code_identifier': badge.code_identifier,
@@ -59,8 +65,6 @@ class QRCodePublicResolveView(APIView):
                 'vehicle_registration': badge.vehicle_registration,
                 'vehicle_model': badge.vehicle_model,
                 'is_active': True,
-                'scan_count': badge.scan_count,
-                'last_scanned_at': badge.last_scanned_at,
             },
             message="Safe-QR badge verified."
         )
