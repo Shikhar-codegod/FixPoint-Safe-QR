@@ -25,24 +25,38 @@ class FieldEncryptionService:
     Centralized service for symmetric field-level encryption and decryption.
     """
     _fernet = None
+    _current_key = None
+
+    @classmethod
+    def reset_cipher(cls):
+        """
+        Resets cached cipher instance (useful when switching settings dynamically during tests).
+        """
+        cls._fernet = None
+        cls._current_key = None
 
     @classmethod
     def get_cipher(cls) -> Fernet:
-        if cls._fernet is None:
-            key = getattr(settings, 'FIELD_ENCRYPTION_KEY', None)
-            if not key:
-                raise ImproperlyConfigured(
-                    "FIELD_ENCRYPTION_KEY setting is required for field-level encryption."
-                )
-            if isinstance(key, str):
-                key = key.encode('utf-8')
+        key = getattr(settings, 'FIELD_ENCRYPTION_KEY', None)
+        if not key:
+            raise ImproperlyConfigured(
+                "FIELD_ENCRYPTION_KEY setting is required for field-level encryption."
+            )
+        if isinstance(key, str):
+            key_bytes = key.encode('utf-8')
+        else:
+            key_bytes = key
+
+        if cls._fernet is None or cls._current_key != key_bytes:
             try:
-                cls._fernet = Fernet(key)
-            except Exception as exc:
+                cls._fernet = Fernet(key_bytes)
+                cls._current_key = key_bytes
+            except Exception:
                 raise ImproperlyConfigured(
-                    f"Invalid FIELD_ENCRYPTION_KEY format. Must be a valid 32 url-safe base64 key: {exc}"
+                    "Invalid FIELD_ENCRYPTION_KEY format. Must be a valid 32 url-safe base64 key."
                 )
         return cls._fernet
+
 
     @classmethod
     def encrypt(cls, plaintext: str) -> str:

@@ -18,6 +18,12 @@ class IncidentType(models.TextChoices):
     HAZARD = 'HAZARD', 'Road Hazard'
     OTHER = 'OTHER', 'Other Incident'
 
+# Backward compatibility aliases for Phase 1 / foundation references
+IncidentType.ROAD_ACCIDENT = IncidentType.ACCIDENT
+IncidentType.FIRE_HAZARD = IncidentType.HAZARD
+IncidentType.VEHICLE_BREAKDOWN = IncidentType.OTHER
+IncidentType.MEDICAL_EMERGENCY = IncidentType.OTHER
+
 class IncidentPriority(models.TextChoices):
     LOW = 'LOW', 'Low'
     MEDIUM = 'MEDIUM', 'Medium'

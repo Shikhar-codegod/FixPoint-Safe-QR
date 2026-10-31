@@ -10,6 +10,7 @@ class QRCodeBadgeSerializer(serializers.ModelSerializer):
             'id',
             'owner_email',
             'code_identifier',
+            'generation',
             'vehicle_registration',
             'vehicle_model',
             'status',
@@ -18,4 +19,4 @@ class QRCodeBadgeSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'scan_count', 'last_scanned_at', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'generation', 'scan_count', 'last_scanned_at', 'created_at', 'updated_at']

@@ -3,6 +3,7 @@ import uuid
 from typing import Optional, Dict, Any
 from django.db import transaction
 from django.core.files.base import ContentFile
+from django.core.exceptions import ValidationError
 from PIL import Image
 from apps.audit.services import log_audit_event
 from .models import (
@@ -13,6 +14,30 @@ from .models import (
     LocationPrecision,
     IncidentPhoto,
 )
+
+# Permitted lifecycle status transitions
+PERMITTED_TRANSITIONS = {
+    IncidentStatus.REPORTED: {
+        IncidentStatus.DISPATCHED,
+        IncidentStatus.IN_PROGRESS,
+        IncidentStatus.CLOSED,
+    },
+    IncidentStatus.DISPATCHED: {
+        IncidentStatus.IN_PROGRESS,
+        IncidentStatus.RESOLVED,
+        IncidentStatus.CLOSED,
+    },
+    IncidentStatus.IN_PROGRESS: {
+        IncidentStatus.RESOLVED,
+        IncidentStatus.CLOSED,
+    },
+    IncidentStatus.RESOLVED: {
+        IncidentStatus.CLOSED,
+        IncidentStatus.IN_PROGRESS,  # Re-opened
+    },
+    IncidentStatus.CLOSED: set(),  # Terminal state
+}
+
 
 def create_incident(
     incident_type: str = IncidentType.ACCIDENT,
@@ -58,22 +83,71 @@ def create_incident(
         )
     return incident
 
+
+def update_incident(
+    incident: IncidentRecord,
+    new_status: Optional[str] = None,
+    description: Optional[str] = None,
+    actor=None
+) -> IncidentRecord:
+    """
+    Updates an incident record with pessimistic row locking and status transition validation.
+    """
+    with transaction.atomic():
+        locked_incident = IncidentRecord.objects.select_for_update().get(id=incident.id)
+        update_fields = ['updated_at']
+
+        if new_status and new_status != locked_incident.status:
+            allowed = PERMITTED_TRANSITIONS.get(locked_incident.status, set())
+            if new_status not in allowed:
+                raise ValidationError(
+                    f"Invalid status transition from '{locked_incident.status}' to '{new_status}'."
+                )
+
+            old_status = locked_incident.status
+            locked_incident.status = new_status
+            update_fields.append('status')
+
+            log_audit_event(
+                action='INCIDENT_STATUS_CHANGED',
+                actor=actor,
+                target_model='IncidentRecord',
+                target_id=str(locked_incident.id),
+                payload={
+                    'old_status': old_status,
+                    'new_status': new_status,
+                    'incident_number': locked_incident.incident_number
+                }
+            )
+
+        if description is not None and description != locked_incident.description:
+            locked_incident.description = description
+            update_fields.append('description')
+
+            log_audit_event(
+                action='INCIDENT_DESCRIPTION_CHANGED',
+                actor=actor,
+                target_model='IncidentRecord',
+                target_id=str(locked_incident.id),
+                payload={
+                    'incident_number': locked_incident.incident_number,
+                    'description_changed': True,
+                    # Description content is intentionally omitted — may contain PII
+                }
+            )
+
+        if len(update_fields) > 1:
+            locked_incident.save(update_fields=update_fields)
+
+        return locked_incident
+
+
 def update_incident_status(incident: IncidentRecord, new_status: str, actor=None) -> IncidentRecord:
-    old_status = incident.status
-    incident.status = new_status
-    incident.save(update_fields=['status', 'updated_at'])
-    log_audit_event(
-        action='INCIDENT_STATUS_CHANGED',
-        actor=actor,
-        target_model='IncidentRecord',
-        target_id=str(incident.id),
-        payload={
-            'old_status': old_status,
-            'new_status': new_status,
-            'incident_number': incident.incident_number
-        }
-    )
-    return incident
+    """
+    Thin wrapper for backward compatibility — delegates to update_incident().
+    """
+    return update_incident(incident=incident, new_status=new_status, actor=actor)
+
 
 def add_incident_photo(incident: IncidentRecord, uploaded_file, actor=None) -> IncidentPhoto:
     """
@@ -102,7 +176,7 @@ def add_incident_photo(incident: IncidentRecord, uploaded_file, actor=None) -> I
     # Re-encode image to strip EXIF and GPS metadata
     uploaded_file.seek(0)
     image = Image.open(uploaded_file)
-    
+
     # Normalize RGB for JPEG save
     save_format = 'JPEG'
     content_type = 'image/jpeg'
@@ -150,9 +224,9 @@ def add_incident_photo(incident: IncidentRecord, uploaded_file, actor=None) -> I
 
 def upgrade_incident_to_alert(incident: IncidentRecord, actor=None):
     """
-    Upgrades an incident to an emergency alert with severity HIGH.
-    Links the created alert to the incident, logs an audit event,
-    and automatically triggers contact notifications for the vehicle owner.
+    Upgrades an incident to an emergency alert DRAFT.
+    Links the created alert to the incident and logs an audit event.
+    The resulting alert requires explicit confirmation before any emergency workflow starts.
     """
     from apps.alerts.services import create_alert_record
     from apps.alerts.models import AlertSeverity
@@ -194,4 +268,3 @@ def upgrade_incident_to_alert(incident: IncidentRecord, actor=None):
             }
         )
     return alert
-

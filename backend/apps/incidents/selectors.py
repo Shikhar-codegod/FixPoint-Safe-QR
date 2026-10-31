@@ -1,6 +1,8 @@
 from typing import Optional
+from django.db import models
 from django.db.models import QuerySet, Case, When, Value, IntegerField, Q
 from .models import IncidentRecord, IncidentPriority
+
 
 def list_scoped_incidents(user) -> QuerySet[IncidentRecord]:
     """
@@ -16,6 +18,7 @@ def list_scoped_incidents(user) -> QuerySet[IncidentRecord]:
     return qs.filter(
         Q(reporter=user) | Q(qr_badge__user=user)
     ).distinct()
+
 
 def get_operator_queue(status: Optional[str] = None, category: Optional[str] = None) -> QuerySet[IncidentRecord]:
     """
@@ -40,6 +43,42 @@ def get_operator_queue(status: Optional[str] = None, category: Optional[str] = N
         qs = qs.filter(incident_type=category)
 
     return qs.order_by('priority_rank', 'created_at')
+
+
+def list_incidents_for_user(user, status: Optional[str] = None) -> QuerySet[IncidentRecord]:
+    """
+    Returns incidents filtered according to user role and authorization:
+    - Operators, supervisors, and admins can view all incidents.
+    - Verified responders can view incidents assigned to them or reported by them.
+    - Customers, public users, and unverified responders can only view incidents they reported.
+    """
+    from apps.responders.models import ResponderDispatch
+
+    qs = IncidentRecord.objects.select_related('reporter')
+
+    if (
+        user.role in ['OPERATOR', 'SUPERVISOR', 'ADMIN']
+        or getattr(user, 'is_staff', False)
+        or getattr(user, 'is_superuser', False)
+    ):
+        pass
+    elif (
+        user.role in ['POLICE_RESPONDER', 'MEDICAL_RESPONDER']
+        and getattr(user, 'is_verified_responder', False)
+    ):
+        assigned_incident_ids = ResponderDispatch.objects.filter(
+            responder=user
+        ).values_list('incident_id', flat=True)
+        qs = qs.filter(
+            models.Q(id__in=assigned_incident_ids) | models.Q(reporter=user)
+        )
+    else:
+        qs = qs.filter(reporter=user)
+
+    if status:
+        qs = qs.filter(status=status)
+    return qs
+
 
 def get_incident_by_number(incident_number: str) -> Optional[IncidentRecord]:
     return IncidentRecord.objects.filter(

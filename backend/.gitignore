@@ -46,7 +46,7 @@ staticfiles/
 htmlcov/
 
 # Celery
-celerybeat-schedule
+celerybeat-schedule*
 celerybeat.pid
 
 # Logs
